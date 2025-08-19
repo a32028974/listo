@@ -5,77 +5,88 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Registrar trabajos hechos</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background: #f5f5f5;
-    }
-    h2 {
-      color: #333;
-    }
-    textarea {
-      width: 100%;
-      height: 200px;
-      font-size: 16px;
-      padding: 10px;
-      margin-bottom: 20px;
-      resize: vertical;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      background: #007BFF;
-      color: white;
-      border: none;
-      cursor: pointer;
-      border-radius: 6px;
-    }
-    button:hover {
-      background: #0056b3;
-    }
-    #mensaje {
-      margin-top: 20px;
-      font-weight: bold;
-      color: green;
-    }
+    body{font-family:system-ui, Arial, sans-serif; margin:20px; background:#f7f7f7;}
+    h2{margin:0 0 10px}
+    .hint{color:#555; margin-bottom:12px}
+    textarea{width:100%; min-height:200px; font-size:16px; padding:10px; resize:vertical}
+    button{margin-top:12px; padding:10px 14px; border:1px solid #d7dbe0; border-radius:8px; background:#111827; color:#fff; cursor:pointer}
+    button:disabled{opacity:.6; cursor:not-allowed}
+    .ok{color:#065f46; margin-top:12px}
+    .warn{color:#92400e; margin-top:8px}
   </style>
 </head>
 <body>
   <h2>Registrar trabajos hechos</h2>
-  <p>Ingresá los números de trabajo, uno por línea:</p>
-  
-  <textarea id="trabajos" placeholder="Ejemplo:&#10;100001&#10;100002&#10;100003"></textarea>
-  
-  <button onclick="registrarTrabajos()">Registrar trabajos hechos</button>
-  
-  <div id="mensaje"></div>
+  <div class="hint">Pegá los N° de trabajo, <b>uno por línea</b>, y presioná “Registrar”.</div>
+
+  <textarea id="trabajos" placeholder="Ejemplo:
+50819095609
+50819107809
+50819102541"></textarea>
+
+  <br><button id="btn">Registrar trabajos hechos</button>
+
+  <div id="out"></div>
 
   <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbwzsiRhsOx1Vdyw0YvKfhgukL4FPKyvx68BH_wrD7wf5_SPvuyse3PLz72LyuBO5zCnyA/exec";
 
-    async function registrarTrabajos() {
-      const textarea = document.getElementById("trabajos");
-      const mensaje = document.getElementById("mensaje");
-      const numeros = textarea.value.split("\n").map(n => n.trim()).filter(n => n);
+    function parseNumeros(text){
+      // separa por líneas, saca espacios, ignora vacíos/duplicados
+      const set = new Set(
+        text.split(/\r?\n/)
+            .map(s => s.trim())
+            .filter(Boolean)
+      );
+      return [...set];
+    }
 
-      if (numeros.length === 0) {
-        alert("Por favor ingresá al menos un número de trabajo.");
+    document.getElementById('btn').addEventListener('click', async () => {
+      const out = document.getElementById('out');
+      const nums = parseNumeros(document.getElementById('trabajos').value);
+      if (nums.length === 0){
+        out.innerHTML = '<div class="warn">No hay números para enviar.</div>';
         return;
       }
+      out.textContent = 'Enviando…';
+      document.getElementById('btn').disabled = true;
 
-      for (let numero of numeros) {
-        try {
-          await fetch(`${API_URL}?accion=registrarHecho&nro=${encodeURIComponent(numero)}`);
-        } catch (err) {
-          console.error("Error al registrar:", err);
-          mensaje.innerText = "⚠️ Error al registrar algunos trabajos.";
+      try {
+        // Apps Script espera POST x-www-form-urlencoded con:
+        //   marcarHechos=1
+        //   payload = {"trabajos":[...]}
+        const body = new URLSearchParams({
+          marcarHechos: '1',
+          payload: JSON.stringify({ trabajos: nums })
+        });
+
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body
+        });
+
+        const data = await res.json();
+        if (!data.ok){
+          out.innerHTML = `<div class="warn">❌ Error del servidor: ${data.error || 'desconocido'}</div>`;
           return;
         }
-      }
 
-      mensaje.innerText = "✅ Trabajos registrados con éxito.";
-      textarea.value = "";
-    }
+        // feedback
+        const escritos = data.escritos || 0;
+        const noEncon  = Array.isArray(data.noEncontrados) ? data.noEncontrados : [];
+        out.innerHTML =
+          `<div class="ok">✅ Registrados: ${escritos}</div>` +
+          (noEncon.length ? `<div class="warn">No encontrados: ${noEncon.join(', ')}</div>` : '');
+
+        if (escritos > 0) document.getElementById('trabajos').value = '';
+      } catch (err) {
+        console.error(err);
+        out.innerHTML = '<div class="warn">❌ Error de red al contactar el Apps Script.</div>';
+      } finally {
+        document.getElementById('btn').disabled = false;
+      }
+    });
   </script>
 </body>
 </html>

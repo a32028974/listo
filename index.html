@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registrar trabajos hechos 12.35 </title>
+  <title>Registrar trabajos hechos 12.35</title>
   <style>
     body{font-family:system-ui, Arial, sans-serif; margin:20px; background:#f7f7f7;}
     h2{margin:0 0 10px}
@@ -41,6 +41,11 @@
       return [...set];
     }
 
+    // ⬅ foco automático al cargar la página
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('trabajos').focus();
+    });
+
     document.getElementById('btn').addEventListener('click', async () => {
       const out = document.getElementById('out');
       const nums = parseNumeros(document.getElementById('trabajos').value);
@@ -52,9 +57,6 @@
       document.getElementById('btn').disabled = true;
 
       try {
-        // Apps Script espera POST x-www-form-urlencoded con:
-        //   marcarHechos=1
-        //   payload = {"trabajos":[...]}
         const body = new URLSearchParams({
           marcarHechos: '1',
           payload: JSON.stringify({ trabajos: nums })
@@ -72,7 +74,6 @@
           return;
         }
 
-        // feedback
         const escritos = data.escritos || 0;
         const noEncon  = Array.isArray(data.noEncontrados) ? data.noEncontrados : [];
         out.innerHTML =
